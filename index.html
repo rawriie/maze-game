@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    button {
+        padding: 10px;
+    }
+
+    #usepc {
+        position: fixed;
+        inset: 0;
+        background-color: black;
+        z-index: 10;
+        color: white;
+        font-size: large;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    div {
+        display: flex;
+        justify-content: center;
+        padding-top: 10px;
+    }
+
+    #canvas {
+        border: 1px solid black;
+
+
+    }
+
+    body {
+        padding: 0;
+        margin: 0;
+
+    }
+
+    @media screen and (min-width: 768px) {
+        #usepc {
+            display: none;
+        }
+    }
+</style>
+
+<body>
+    <div id="usepc">
+        Please use a pc to play
+    </div>
+    <div>
+        <h2>Impossible Maze Game?</h2>
+    </div>
+    <div>
+
+        <canvas id="canvas"></canvas>
+
+
+    </div>
+    <div>
+        <h2>Use WASD or Arrow Controls to Move</h2>
+
+    </div>
+
+
+
+
+    <script>
+        const canvas = document.getElementById('canvas')
+        const screen_width = window.innerWidth;
+        const screen_height = window.innerHeight / 2;
+
+        canvas.width = screen_width / 2
+        canvas.height = screen_height
+
+        const ctx = canvas.getContext('2d');
+
+        const map = [
+            [1, 1, 0, 1, 1, 1, 1, 0, 1, 1],
+            [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+            [1, 1, 0, 1, 1, 1, 0, 0, 0, 1],
+            [1, 1, 0, 1, 1, 1, 1, 0, 1, 1],
+            [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+            [1, 1, 0, 1, 1, 1, 0, 0, 0, 1],
+        ]
+
+        const rays = 160;
+        const FOV = 60 * (Math.PI / 180);
+
+        let player_x = 2.5;
+        let player_y = 2.5;
+        let player_angle = 0.0;
+        const map_width = 10;
+        const map_height = 10;
+        const move_speed = 0.01;
+        const turning_speed = 1;
+
+
+        let side = 0;
+
+
+        function cast_ray(player_x, player_y, direction_x, direction_y) {
+            let map_x = Math.floor(player_x);
+            let map_y = Math.floor(player_y);
+
+            const delta_distance_x = Math.abs(1 / (direction_x === 0 ? 0.000001 : direction_x));
+            const delta_distance_y = Math.abs(1 / (direction_y === 0 ? 0.000001 : direction_y));
+
+            let step_x = 0;
+            let step_y = 0;
+            let x_wall_distance = 0;
+            let y_wall_distance = 0;
+
+            if (direction_x < 0) {
+                step_x = -1;
+                x_wall_distance = (player_x - map_x) * delta_distance_x;
+            }
+            else {
+                step_x = 1;
+                x_wall_distance = (map_x + 1 - player_x) * delta_distance_x;
+            }
+            if (direction_y < 0) {
+                step_y = -1;
+                y_wall_distance = (player_y - map_y) * delta_distance_y;
+            }
+            else {
+                step_y = 1;
+                y_wall_distance = (map_y + 1 - player_y) * delta_distance_y;
+            }
+
+            let hit_wall = false;
+
+            while (!hit_wall) {
+                if (x_wall_distance < y_wall_distance) {
+                    x_wall_distance += delta_distance_x;
+                    map_x += step_x;
+                    side = 0
+                }
+                else {
+                    y_wall_distance += delta_distance_y;
+                    map_y += step_y;
+                    side = 1;
+                }
+
+                if (map_x < 0 || map_x >= map_width || map_y < 0 || map_y >= map_height) {
+                    return 1000.0;
+                }
+
+
+                if (map[map_y][map_x]) {
+                    hit_wall = true
+                }
+            }
+
+
+            if (side === 0) {
+                x_wall_distance -= delta_distance_x;
+                return x_wall_distance;
+            }
+            else {
+                y_wall_distance -= delta_distance_y;
+                return y_wall_distance
+            }
+
+            return side;
+
+        };
+        function render() {
+            const half_fov = FOV / 2;
+            const start_angle = player_angle - half_fov;
+            const step_angle = FOV / rays;
+            const rectangle_width = Math.trunc(screen_width / rays);
+            ctx.fillStyle = 'lightblue'
+            ctx.fillRect(0, 0, canvas.width, canvas.height / 2)
+
+
+            for (let i = 0; i < rays; i++) {
+                const ray_angle = start_angle + i * step_angle;
+                const direction_x = Math.cos(ray_angle);
+                const direction_y = Math.sin(ray_angle);
+
+                const distance = Math.max(cast_ray(player_x, player_y, direction_x, direction_y), 0.01) * Math.cos(ray_angle - player_angle);
+                const wall_height = Math.floor(screen_height / distance)
+                const top = Math.trunc((screen_height - wall_height) / 2)
+                const color = side === 1 ? 'darkred' : 'red'
+                ctx.fillStyle = `${color}`
+                ctx.fillRect(i * rectangle_width, top, rectangle_width, wall_height);
+
+
+
+            }
+            ctx.fillStyle = 'black';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+
+
+            ctx.fillText('There is no exit.', canvas.width / 2, 60,);
+        }
+        render()
+
+        let move_forward = false;
+        let move_right = false;
+        let move_left = false;
+        let move_backwards = false;
+        let turn_right = false;
+        let turn_left = false;
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'w' || event.key === 'ArrowUp') {
+                move_forward = true;
+            }
+            if (event.key === 'a') {
+                move_left = true;
+            }
+            if (event.key === 's' || event.key === 'ArrowDown') {
+                move_backwards = true
+            }
+            if (event.key === 'd') {
+                move_right = true;
+            }
+            if (event.key === 'ArrowLeft') {
+                turn_left = true;
+
+            }
+            if (event.key === 'ArrowRight') {
+                turn_right = true;
+            }
+        })
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'w' || event.key === 'ArrowUp') {
+                move_forward = false;
+            }
+            if (event.key === 'a') {
+                move_left = false;
+            }
+            if (event.key === 's' || event.key === 'ArrowDown') {
+                move_backwards = false
+            }
+            if (event.key === 'd') {
+                move_right = false;
+            }
+            if (event.key === 'ArrowLeft') {
+                turn_left = false;
+            }
+            if (event.key === 'ArrowRight') {
+                turn_right = false;
+            }
+        })
+
+        let gameloop = setInterval(() => {
+            if (turn_left) {
+                player_angle -= turning_speed * (Math.PI / 180);
+            }
+            if (turn_right) {
+                player_angle += turning_speed * (Math.PI / 180);
+            }
+
+            let move_x = 0;
+            let move_y = 0;
+
+            if (move_forward) {
+                move_x += Math.cos(player_angle) * move_speed;
+                move_y += Math.sin(player_angle) * move_speed
+            }
+            if (move_backwards) {
+                move_x -= Math.cos(player_angle) * move_speed;
+                move_y -= Math.sin(player_angle) * move_speed
+            }
+            if (move_left) {
+                move_x += Math.cos(player_angle - Math.PI / 2) * move_speed;
+                move_y += Math.sin(player_angle - Math.PI / 2) * move_speed
+            }
+            if (move_right) {
+                move_x += Math.cos(player_angle + Math.PI / 2) * move_speed;
+                move_y += Math.sin(player_angle + Math.PI / 2) * move_speed
+            }
+
+            const new_px = player_x + move_x
+            const new_py = player_y + move_y
+            if (map[Math.trunc(new_py)][Math.trunc(new_px)] === 0) {
+                player_x = new_px
+                player_y = new_py
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+            render()
+
+        }, 10)
+    </script>
+</body>
+
+</html>
